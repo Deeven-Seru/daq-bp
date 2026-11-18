@@ -43,12 +43,25 @@ Evaluated on the IBM [[144, 12, 12]] Gross code against standard BP-OSD (OSD-CS 
 
 *Key Systems Result: Standard BP-OSD invokes $O(N^3)$ Gaussian elimination on 100% of syndrome extraction cycles. By deploying 5-bit integer DAQ-BP as an ultra-fast hardware front-end ($10.5\,\text{ns}$ latency, 0 DSP multipliers), **$93.1\%$ to $98.8\%$ of all matrix inversions are completely eliminated** while maintaining identical logical error suppression.*
 
+## Interactive Validation Notebook
+
+An interactive, executable demonstration and visual verification suite is available under `notebooks/`:
+- **Jupyter Notebook:** [`notebooks/daq_bp_validation.ipynb`](notebooks/daq_bp_validation.ipynb)
+- **Rendered PDF Report:** [`notebooks/daq_bp_interactive_validation.pdf`](notebooks/daq_bp_interactive_validation.pdf)
+
+The notebook provides:
+1. Matrix sparsity visualization of the IBM $[[144, 12, 12]]$ check matrices $H_X$ and $H_Z$.
+2. Step-by-step 5-bit lookup table plots comparing quantized vs. continuous hyperbolic functions.
+3. Live multi-qubit Pauli-X error injection walkthrough.
+4. Comparative Monte Carlo plots illustrating LER pseudo-thresholds and the elimination of $>93\%$ of $O(N^3)$ matrix inversions.
+
 ## Directory Layout
 
 ```text
 ├── src/                # Core Python package (Gross code constructor & decoders)
 ├── rtl/                # Synthesizable SystemVerilog implementation
-├── benchmarks/         # Multi-process simulation scripts
+├── benchmarks/         # Multi-process simulation scripts (including BP-OSD)
+├── notebooks/          # Executable Jupyter notebook & rendered PDF report
 └── paper/              # LaTeX manuscript and compiled PDF
 ```
 
