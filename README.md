@@ -58,7 +58,7 @@ Evaluated on the IBM [[144, 12, 12]] Gross code under independent data-qubit Pau
 git clone https://github.com/Deeven-Seru/daq-bp.git
 cd daq-bp
 pip install -e .
-python benchmarks/run_stim_circuit_level.py
+python benchmarks/benchmark_code_capacity.py
 ```
 
 ## Hardware Model Notes
