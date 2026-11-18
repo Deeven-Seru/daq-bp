@@ -19,8 +19,8 @@
 \date{\today}
 
 \begin{abstract}
-Quantum Low-Density Parity-Check (qLDPC) codes, particularly bivariate bicycle (BB) codes, drastically reduce physical qubit overheads compared to traditional surface codes. However, physical realization is fundamentally obstructed by the \textit{real-time decoder backlog}: classical error decoders must process syndrome updates within sub-microsecond physical coherence intervals ($< 1\,\mu\text{s}$). Belief Propagation with Ordered Statistics Decoding (BP-OSD) incurs high matrix inversion latency, while floating-point heuristic decoders (such as Relay-BP) saturate FPGA/ASIC digital signal processing (DSP) slices with transcendental multiplications. 
-In this work, we present \textbf{Degeneracy-Aware Quantized Belief Propagation (DAQ-BP)}, an integer-arithmetic message-passing decoder engineered for low-complexity hardware execution. DAQ-BP introduces: (i) a 5-bit fixed-point quantization schedule operating on $[-15, +15]$ with zero DSP multipliers, (ii) an iteration-adaptive degeneracy damping shift $\alpha_{\text{deg}}(k) = {\gg} \lfloor k/10 \rfloor$, and (iii) an anti-trapping momentum memory operator that detects sign-inversion cycles across degenerate cosets. Evaluated on the IBM $[[144, 12, 12]]$ Gross bivariate bicycle code under code-capacity Pauli noise ($2,000$ shots per point), DAQ-BP achieves logical error rates on par with 64-bit floating-point BP ($0.30\%$ vs $0.35\%$ at $p=0.005$, and $1.25\%$ vs $1.25\%$ at $p=0.010$). An estimated 4-stage pipelined hardware model running at $400\,\text{MHz}$ ($2.5\,\text{ns}$ clock period, $10\,\text{ns}$ per iteration) yields a mean converged latency of $\sim 10.5\,\text{ns}$ at low error rates and a bounded worst-case tail latency of $350\,\text{ns}$ ($35$ iterations), well within microsecond coherence budgets.
+Quantum Low-Density Parity-Check (qLDPC) codes, particularly bivariate bicycle (BB) codes, drastically reduce physical qubit overheads compared to traditional surface codes. However, physical realization is fundamentally obstructed by the \textit{real-time decoder backlog}: classical error decoders must process syndrome updates within sub-microsecond physical coherence intervals ($< 1\,\mu\text{s}$). Belief Propagation with Ordered Statistics Decoding (BP-OSD) provides near-optimal logical suppression but incurs $O(N^3)$ Gaussian elimination latency on every syndrome cycle, saturating controller backplanes.
+In this work, we present \textbf{Degeneracy-Aware Quantized Belief Propagation (DAQ-BP)}, an integer-arithmetic message-passing decoder engineered as a real-time hardware front-end filter for qLDPC codes. DAQ-BP introduces: (i) a 5-bit fixed-point quantization schedule operating on $[-15, +15]$ with zero DSP multipliers, (ii) an iteration-adaptive degeneracy damping shift $\alpha_{\text{deg}}(k) = {\gg} \lfloor k/10 \rfloor$, and (iii) an anti-trapping momentum memory operator that detects sign-inversion cycles across degenerate cosets. Evaluated on the canonical IBM $[[144, 12, 12]]$ Gross bivariate bicycle code against the standard BP-OSD reference (OSD-CS order 10), DAQ-BP as a standalone integer decoder resolves $>90\%$ of non-zero syndromes at operational fault rates ($p \le 1\%$) in an average of $1.03 - 1.07$ iterations. When paired with an OSD fallback, the hybrid DAQ-BP+OSD architecture achieves identical logical error suppression to floating-point BP-OSD ($0.00\%$ LER at $p \le 0.01$) while eliminating $93.1\%$ to $98.8\%$ of $O(N^3)$ matrix inversion calls. An estimated 4-stage pipelined FPGA datapath at $400\,\text{MHz}$ achieves a mean converged latency of $10.5\,\text{ns}$, demonstrating a scalable hardware path to breaking the real-time decoder backlog.
 \end{abstract}
 
 \maketitle
@@ -89,53 +89,51 @@ Halving the momentum when signs alternate collapses symmetric limit cycles witho
 
 \section{Empirical Evaluation}
 
-We validate DAQ-BP on the canonical IBM $[[144, 12, 12]]$ bivariate bicycle Gross code~\cite{bravyi2024high} ($n=144, k=12, d=12$) under a code-capacity Pauli-X noise model across $2,000$ Monte Carlo shots per physical error rate point $p \in [0.005, 0.050]$.
+We validate DAQ-BP on the canonical IBM $[[144, 12, 12]]$ bivariate bicycle Gross code~\cite{bravyi2024high} ($n=144, k=12, d=12$) under independent data-qubit Pauli-X noise across $1,000$ Monte Carlo shots per physical error rate point $p \in [0.005, 0.050]$.
 
-\subsection{Logical Error Rate (LER) and Convergence}
+\subsection{Logical Error Rate Against Standard BP-OSD}
 
-Table~\ref{tab:ler_results} presents the Logical Error Rate (measured via residual observable coset parity) across four decoders: Float-BP, Normalized Min-Sum ($\alpha=0.75$), Relay-BP ($\gamma=-0.25$), and DAQ-BP ($5$-bit integer arithmetic).
+Table~\ref{tab:ler_results} evaluates DAQ-BP both as a standalone integer decoder and when paired as a hardware front-end filter for Ordered Statistics Decoding (DAQ-BP+OSD), benchmarked against full floating-point BP-OSD (using combination-sweep order 10 from the standard \texttt{ldpc} library~\cite{roffe2020decoding}).
 
 \begin{table*}[t]
 \centering
-\caption{Logical Error Rate (LER) on IBM $[[144, 12, 12]]$ Gross Code ($2,000$ Shots/Point, Code-Capacity Pauli Noise).}
+\caption{Logical Error Rate (LER) and Matrix Inversion Reduction on IBM $[[144, 12, 12]]$ Gross Code ($1,000$ Shots/Point).}
 \label{tab:ler_results}
-\begin{tabular}{ccccc}
+\begin{tabular}{ccccccc}
 \toprule
-$p$ & Float-BP & NMS ($\alpha=0.75$) & Relay-BP ($\gamma=-0.25$) & \textbf{DAQ-BP (5-bit Integer)} \\
+$p$ & Float-BP & NMS ($\alpha=0.75$) & Relay-BP & \textbf{DAQ-BP (5-bit)} & \textbf{BP-OSD (Float)} & \textbf{DAQ-BP+OSD (Hybrid)} \\
 \midrule
-$0.005$ & $0.35\%$ & $0.15\%$ & $0.40\%$ & $\mathbf{0.30\%}$ \\
-$0.010$ & $1.25\%$ & $0.90\%$ & $1.55\%$ & $\mathbf{1.25\%}$ \\
-$0.020$ & $4.75\%$ & $3.00\%$ & $6.95\%$ & $\mathbf{4.70\%}$ \\
-$0.030$ & $10.35\%$ & $8.80\%$ & $13.95\%$ & $\mathbf{10.70\%}$ \\
-$0.040$ & $13.10\%$ & $12.55\%$ & $17.50\%$ & $\mathbf{15.15\%}$ \\
-$0.050$ & $19.50\%$ & $17.85\%$ & $23.65\%$ & $\mathbf{22.40\%}$ \\
+$0.005$ & $0.20\%$ & $0.10\%$ & $0.20\%$ & $\mathbf{0.10\%}$ & $0.00\%$ & $\mathbf{0.00\%}$ \\
+$0.010$ & $1.40\%$ & $0.80\%$ & $1.30\%$ & $\mathbf{1.20\%}$ & $0.00\%$ & $\mathbf{0.00\%}$ \\
+$0.020$ & $4.40\%$ & $2.60\%$ & $6.30\%$ & $\mathbf{4.30\%}$ & $0.20\%$ & $\mathbf{0.20\%}$ \\
+$0.030$ & $10.60\%$ & $9.20\%$ & $14.60\%$ & $\mathbf{11.10\%}$ & $0.40\%$ & $\mathbf{0.40\%}$ \\
+$0.040$ & $13.40\%$ & $12.30\%$ & $16.30\%$ & $\mathbf{14.20\%}$ & $1.00\%$ & $\mathbf{1.00\%}$ \\
+$0.050$ & $19.30\%$ & $18.30\%$ & $21.70\%$ & $\mathbf{21.40\%}$ & $2.30\%$ & $\mathbf{2.30\%}$ \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-\subsection{Convergence Dynamics and Timeout Breakdown}
+\subsection{Elimination of the $O(N^3)$ Matrix Inversion Bottleneck}
 
-To characterize real-time feasibility, Table~\ref{tab:conv_results} details the convergence behavior of DAQ-BP specifically on non-zero syndrome instances. 
+While standalone belief propagation exhibits trapping sets at high error rates, Table~\ref{tab:conv_results} demonstrates that DAQ-BP functions as an ultra-fast hardware filter. At physical error rates $p \le 0.01$, DAQ-BP resolves $>90\%$ of non-zero syndromes in $1.03 - 1.07$ iterations without invoking Gaussian elimination. In the hybrid DAQ-BP+OSD architecture, the OSD post-processor is only invoked for the residual un-converged shots ($1.2\%$ at $p=0.005$, and $6.9\%$ at $p=0.010$), eliminating $\mathbf{93.1\% \text{ to } 98.8\%}$ of $O(N^3)$ matrix inversions while preserving identical logical suppression to full BP-OSD.
 
 \begin{table*}[t]
 \centering
-\caption{DAQ-BP Convergence Dynamics and Timeout Profile on Non-Zero Syndromes ($2,000$ Shots/Point).}
+\caption{Real-Time Filtering Efficiency and OSD Reduction Profile ($1,000$ Shots/Point).}
 \label{tab:conv_results}
 \begin{tabular}{ccccc}
 \toprule
-$p$ & Non-Zero Conv. Rate & Mean Iters (Converged Only) & Timeout Rate ($35$ Iters) & Worst-Case Max Iters \\
+$p$ & DAQ-BP Non-Zero Conv. & Mean Converged Iters & OSD Fallback Rate & Matrix Inversions Avoided \\
 \midrule
-$0.005$ & $\mathbf{96.9\%}$ & $\mathbf{1.04}$ & $3.1\%$ & $35$ \\
-$0.010$ & $\mathbf{90.8\%}$ & $\mathbf{1.06}$ & $9.2\%$ & $35$ \\
-$0.020$ & $\mathbf{70.2\%}$ & $\mathbf{1.15}$ & $29.8\%$ & $35$ \\
-$0.030$ & $43.9\%$ & $1.16$ & $56.1\%$ & $35$ \\
-$0.040$ & $27.0\%$ & $1.18$ & $73.0\%$ & $35$ \\
-$0.050$ & $13.2\%$ & $1.10$ & $86.8\%$ & $35$ \\
+$0.005$ & $\mathbf{97.7\%}$ & $\mathbf{1.03}$ & $\mathbf{1.2\%}$ & $\mathbf{98.8\%}$ \\
+$0.010$ & $\mathbf{90.7\%}$ & $\mathbf{1.07}$ & $\mathbf{6.9\%}$ & $\mathbf{93.1\%}$ \\
+$0.020$ & $\mathbf{71.6\%}$ & $\mathbf{1.16}$ & $27.1\%$ & $\mathbf{72.9\%}$ \\
+$0.030$ & $43.9\%$ & $1.15$ & $55.4\%$ & $44.6\%$ \\
+$0.040$ & $26.0\%$ & $1.12$ & $73.9\%$ & $26.1\%$ \\
+$0.050$ & $13.3\%$ & $1.10$ & $86.6\%$ & $13.4\%$ \\
 \bottomrule
 \end{tabular}
 \end{table*}
-
-At operational fault rates ($p \le 0.01$), DAQ-BP resolves over $90\%$ of non-zero syndromes within an average of $1.04 - 1.06$ iterations. As physical error rates increase toward $p=0.05$, the unassisted belief propagation algorithm experiences trapping sets due to non-planar length-4 cycles, causing timeout rates to increase. Crucially, across all tested operational rates ($p \le 0.02$), 5-bit integer DAQ-BP matches 64-bit floating-point BP within $\pm 0.3\%$ LER without requiring floating-point units.
 
 \section{Hardware Microarchitecture (Estimated Model)}
 Synthesizable SystemVerilog models were developed for check and variable processing elements:
