@@ -15,20 +15,33 @@ Hardware-efficient, integer-only belief propagation decoder designed for quantum
 - **Anti-Trapping Momentum**: Sign-inversion tracking that halves message momentum upon oscillation to escape degenerate trapping sets.
 - **Pipelined RTL Architecture**: Synthesizable SystemVerilog models for sub-60 ns syndrome resolution on modern FPGAs (analytical timing model).
 
-## Experimental Results (Preliminary)
+## Experimental Results (Code-Capacity Model)
 
-Syndrome extraction memory experiment on the IBM [[144, 12, 12]] Gross code across 3 rounds under depolarizing noise (1,000 shots per point):
+Evaluated on the IBM [[144, 12, 12]] Gross code under independent data-qubit Pauli-X noise across 2,000 Monte Carlo shots per point:
 
-| Physical Noise $p$ | Float-BP LER | NMS LER ($\alpha=0.75$) | Relay-BP LER ($\gamma=-0.25$) | **DAQ-BP (5-bit Integer)** | Relative LER Gain vs Float-BP |
+### 1. Logical Error Rate (LER)
+
+| Physical Error $p$ | Float-BP LER | NMS LER ($\alpha=0.75$) | Relay-BP LER | **DAQ-BP LER (5-bit Integer)** |
+| :---: | :---: | :---: | :---: | :---: |
+| 0.005 | 0.35% | 0.15% | 0.40% | **0.30%** |
+| 0.010 | 1.25% | 0.90% | 1.55% | **1.25%** |
+| 0.020 | 4.75% | 3.00% | 6.95% | **4.70%** |
+| 0.030 | 10.35% | 8.80% | 13.95% | **10.70%** |
+| 0.040 | 13.10% | 12.55% | 17.50% | **15.15%** |
+| 0.050 | 19.50% | 17.85% | 23.65% | **22.40%** |
+
+### 2. Convergence Dynamics & Latency Breakdown (DAQ-BP on Non-Zero Syndromes)
+
+| Physical Error $p$ | Non-Zero Conv. % | Mean Iters (Converged) | Mean Latency (Converged) | Timeout % (35 Iters) | Worst-Case Tail Latency |
 | :---: | :---: | :---: | :---: | :---: | :---: |
-| 0.001 | 2.30% | 2.10% | 3.10% | **1.40%** | **-39.1%** |
-| 0.002 | 4.50% | 4.50% | 7.50% | **3.70%** | **-17.8%** |
-| 0.004 | 8.60% | 6.30% | 9.90% | **5.30%** | **-38.4%** |
-| 0.006 | 12.50% | 11.00% | 11.80% | **8.90%** | **-28.8%** |
-| 0.008 | 15.40% | 13.20% | 18.80% | **9.90%** | **-35.7%** |
-| 0.010 | 18.90% | 18.30% | 20.10% | **14.40%** | **-23.8%** |
+| 0.005 | **96.9%** | **1.04** | **10.4 ns** | 3.1% | 350 ns |
+| 0.010 | **90.8%** | **1.06** | **10.6 ns** | 9.2% | 350 ns |
+| 0.020 | **70.2%** | **1.15** | **11.5 ns** | 29.8% | 350 ns |
+| 0.030 | 43.9% | 1.16 | 11.6 ns | 56.1% | 350 ns |
+| 0.040 | 27.0% | 1.18 | 11.8 ns | 73.0% | 350 ns |
+| 0.050 | 13.2% | 1.10 | 11.0 ns | 86.8% | 350 ns |
 
-*Note: Results reflect accumulated syndrome decoding over spatial checks. Relative LER reductions range from 17.8% to 39.1% across tested noise rates. Future work includes evaluating against full 3D space-time detector error models (DEM) and BP-OSD baselines with $\ge 10^5$ shots.*
+*Note: Latency is based on an estimated 4-stage pipeline running at 400 MHz (2.5 ns clock, 10 ns per full iteration). At physical error rates $p \le 1\%$, DAQ-BP resolves over 90% of non-zero syndromes in ~10.5 ns, with worst-case tail latency bounded at 350 ns (35 iterations).*
 
 ## Directory Layout
 
