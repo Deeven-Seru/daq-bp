@@ -2,7 +2,6 @@ import json
 import nbformat as nbf
 
 nb = nbf.v4.new_notebook()
-
 cells = []
 
 # Title & Abstract
@@ -12,19 +11,21 @@ cells.append(nbf.v4.new_markdown_cell("""# DAQ-BP: Degeneracy-Aware Quantized Be
 **Author:** Deeven Seru  
 **Repository:** [github.com/Deeven-Seru/daq-bp](https://github.com/Deeven-Seru/daq-bp)
 
-This notebook executes an interactive demonstration of the **Degeneracy-Aware Quantized Belief Propagation (DAQ-BP)** decoder on the canonical **IBM $[[144, 12, 12]]$ Bivariate Bicycle Gross Code** ($n=144, k=12, d=12$).
+This notebook executes an interactive demonstration of the **Degeneracy-Aware Quantized Belief Propagation (DAQ-BP)** decoder on the canonical **IBM [[144, 12, 12]] Bivariate Bicycle Gross Code** (144 data qubits, 12 logical qubits, distance 12).
 
-#### What this notebook verifies live:
-1. **Gross Code Construction & CSS Orthogonality:** Algebraically constructs $H_X, H_Z$ and checks $H_X H_Z^T \\equiv 0 \\pmod 2$.
-2. **5-bit Integer Quantization & Dynamic LUTs:** Visualizes the 5-bit integer lookup tables that replace continuous $\\tanh / \\text{atanh}$ functions.
-3. **Live Single-Shot Decoding Walkthrough:** Injects a multi-qubit Pauli-X error and tracks message passing step-by-step.
+---
+
+### What this notebook verifies live:
+1. **Gross Code Construction & CSS Orthogonality:** Algebraically constructs check matrices HX and HZ and verifies that HX * HZ^T = 0 (mod 2).
+2. **5-bit Integer Quantization & Dynamic LUTs:** Visualizes the 5-bit integer lookup tables that replace continuous tanh / atanh functions with zero hardware multipliers.
+3. **Live Single-Shot Decoding Walkthrough:** Injects a weight-3 Pauli-X error and tracks syndrome resolution step-by-step.
 4. **Comparative Monte Carlo Benchmark:** Evaluates Logical Error Rate (LER) and convergence iterations across:
    - Standalone Float-BP (64-bit Sum-Product)
-   - Classical Normalized Min-Sum (NMS, $\\alpha=0.75$)
+   - Classical Normalized Min-Sum (NMS, alpha = 0.75)
    - Standalone DAQ-BP (5-bit Integer)
-   - Golden Standard BP-OSD (OSD-CS order 10)
+   - Golden Standard BP-OSD (Order-10 OSD Combination Sweep)
    - Hybrid DAQ-BP + OSD Fallback
-5. **Hardware Latency & OSD Inversion Reduction Visualization:** Generates publication-grade plots illustrating how DAQ-BP eliminates $>93\%$ of $O(N^3)$ matrix inversions.
+5. **Hardware Latency & OSD Inversion Reduction Visualization:** Generates publication-grade plots illustrating how DAQ-BP eliminates over 93% of O(N^3) matrix inversions.
 """))
 
 # Cell 1: Imports
@@ -49,11 +50,13 @@ print("All dependencies successfully loaded.")
 """))
 
 # Cell 2: Markdown Section 1
-cells.append(nbf.v4.new_markdown_cell("""## 1. Code Construction: IBM $[[144, 12, 12]]$ Bivariate Bicycle Code
+cells.append(nbf.v4.new_markdown_cell("""## 1. Code Construction: IBM [[144, 12, 12]] Bivariate Bicycle Code
 
-The code is defined over the group algebra $\\mathbb{F}_2[x, y] / (x^{12} - 1, y^6 - 1)$ by two commuting polynomials:
-$$A(x, y) = x^3 + y + y^2, \\quad B(x, y) = y^3 + x + x^2$$
-The check matrices are constructed as $H_X = [M_A \\mid M_B]$ and $H_Z = [M_B^T \\mid M_A^T]$.
+The code is defined over two commuting polynomials:
+- **A(x, y) = x³ + y + y²**
+- **B(x, y) = y³ + x + x²**
+
+The check matrices are defined as **HX = [MA | MB]** and **HZ = [MB^T | MA^T]**, where each block is a 72 x 72 cyclic translation matrix.
 """))
 
 # Cell 3: Code Construction & Verification
@@ -68,14 +71,14 @@ print(f"CSS Orthogonality Condition H_X * H_Z^T == 0 (mod 2): {is_css_valid}")
 assert is_css_valid, "CSS check failed!"
 
 # Visualize the sparsity pattern of the Gross Code check matrix
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+fig, axes = plt.subplots(1, 2, figsize=(12, 4.8))
 axes[0].spy(H_X, markersize=1.8, color='#1f77b4')
-axes[0].set_title(r"Structure of $H_X = [M_A \mid M_B]$ (IBM [[144, 12, 12]])")
+axes[0].set_title("Structure of H_X = [M_A | M_B] (IBM [[144, 12, 12]])")
 axes[0].set_xlabel("Data Qubit Index (0..143)")
 axes[0].set_ylabel("Check Node Index (0..71)")
 
 axes[1].spy(H_Z, markersize=1.8, color='#d62728')
-axes[1].set_title(r"Structure of $H_Z = [M_B^T \mid M_A^T]$")
+axes[1].set_title("Structure of H_Z = [M_B^T | M_A^T]")
 axes[1].set_xlabel("Data Qubit Index (0..143)")
 axes[1].set_ylabel("Check Node Index (0..71)")
 
@@ -87,13 +90,14 @@ plt.show()
 cells.append(nbf.v4.new_markdown_cell("""## 2. 5-Bit Quantization Architecture (Zero DSP Multipliers)
 
 Continuous floating-point Belief Propagation computes check node updates using transcendental hyperbolic functions:
-$$m_{c \\to v} = 2 \\operatorname{atanh}\\left( (-1)^s \\prod_{v' \\neq v} \\tanh(m_{v' \\to c} / 2) \\right)$$
-In hardware, computing $\\tanh$ and multi-operand floating-point products saturates FPGA DSP blocks.
+- Message check update: **m = 2 * atanh( (-1)^s * Product[tanh(m / 2)] )**
 
-DAQ-BP quantizes all message polarities to signed 5-bit integers in $[-15, +15]$:
-- Scale factor $S = 4.0$ (representing values in steps of $0.25$).
-- Hyperbolic functions are evaluated via static 32-entry lookup tables (LUTs) requiring $<18$ LUTs per processing unit.
-- Multiplications are replaced by integer bit-shifts ($\\gg 5$).
+In hardware, computing continuous tanh and multi-operand floating-point products saturates FPGA DSP slices.
+
+**DAQ-BP replaces continuous math with signed 5-bit integers in [-15, +15]:**
+- **Scale factor:** S = 4.0 (step size of 0.25).
+- **Lookup Tables (LUTs):** 32-entry static integer tables replace continuous tanh and atanh.
+- **Multiplication Elimination:** Multiplications are mapped to hardware bit-shifts (>> 5).
 """))
 
 # Cell 5: Visualizing LUTs
@@ -110,7 +114,7 @@ smooth_q = np.linspace(-15, 15, 200)
 ax1.plot(smooth_q, np.tanh(smooth_q / 8.0) * 32, 'k--', alpha=0.5, label="Continuous 64-bit tanh")
 ax1.set_title("5-bit Quantized tanh LUT (Check Unit)")
 ax1.set_xlabel("Quantized Input LLR q in [-15, +15]")
-ax1.set_ylabel("Fixed-Point Value (Q5 scale /32)")
+ax1.set_ylabel("Fixed-Point Value (Q5 scale / 32)")
 ax1.legend()
 ax1.grid(True, alpha=0.3)
 
@@ -129,7 +133,7 @@ plt.show()
 # Cell 6: Markdown Section 3
 cells.append(nbf.v4.new_markdown_cell("""## 3. Live Decoding Walkthrough: Resolving a Multi-Qubit Error
 
-We inject a random Pauli-X weight-3 error pattern onto data qubits and compare how DAQ-BP and Float-BP resolve the syndrome.
+We inject a random weight-3 Pauli-X error pattern onto data qubits and compare how DAQ-BP and Float-BP resolve the syndrome.
 """))
 
 # Cell 7: Single-Shot Walkthrough
@@ -158,8 +162,8 @@ daq_satisfied = np.array_equal((H_X @ np.array(daq_est)) % 2, syndrome)
 float_satisfied = np.array_equal((H_X @ np.array(float_est)) % 2, syndrome)
 
 print("-" * 65)
-print(f"DAQ-BP (5-bit): Converged={daq_conv} in {daq_it} iters | Residual Syndrome=0: {daq_satisfied} | Python Time: {daq_time_us:.1f} us")
-print(f"Float-BP:       Converged={float_conv} in {float_it} iters | Residual Syndrome=0: {float_satisfied} | Python Time: {float_time_us:.1f} us")
+print(f"DAQ-BP (5-bit): Converged={daq_conv} in {daq_it} iteration(s) | Residual Syndrome=0: {daq_satisfied} | Execution Time: {daq_time_us:.1f} us")
+print(f"Float-BP:       Converged={float_conv} in {float_it} iteration(s) | Residual Syndrome=0: {float_satisfied} | Execution Time: {float_time_us:.1f} us")
 print("-" * 65)
 """))
 
@@ -168,8 +172,8 @@ cells.append(nbf.v4.new_markdown_cell("""## 4. Live Multi-Decoder Benchmark Acro
 
 We evaluate:
 1. **Float-BP:** Standard 64-bit sum-product BP.
-2. **NMS:** Normalized Min-Sum ($\\alpha=0.75$).
-3. **DAQ-BP:** Our 5-bit integer quantized BP.
+2. **NMS:** Normalized Min-Sum (alpha = 0.75).
+3. **DAQ-BP:** Standalone 5-bit integer quantized BP.
 4. **BP-OSD:** Golden standard floating-point BP with Order-10 OSD Combination Sweep.
 5. **DAQ-BP+OSD:** Fast 5-bit integer hardware front-end with OSD fallback on timeouts.
 """))
@@ -251,7 +255,7 @@ print(f"Total benchmark finished in {time.time()-t_start:.1f}s.")
 """))
 
 # Cell 10: Publication-Grade Results Visualization
-cells.append(nbf.v4.new_code_cell("""fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
+cells.append(nbf.v4.new_code_cell("""fig, axes = plt.subplots(1, 2, figsize=(14, 5.2))
 
 # Plot 1: Logical Error Rate Comparison
 ax1 = axes[0]
@@ -294,9 +298,9 @@ plt.show()
 cells.append(nbf.v4.new_markdown_cell("""## 5. Hardware Microarchitecture Latency Summary
 
 Based on the synthesizable SystemVerilog models in `rtl/daq_bp_node.sv`:
-- **Datapath Pipeline:** 4 pipeline stages running at $400\\,\\text{MHz}$ ($2.5\\,\\text{ns}$ clock $\\to 10\\,\\text{ns}$ per iteration).
-- **Mean Converged Latency:** At operational rates ($p \\le 0.01$), average iteration count is $\\approx 1.05$, yielding **$10.5\\,\\text{ns}$** syndrome resolution time.
-- **Worst-Case Tail Latency:** Strictly bounded at $35 \\times 10\\,\\text{ns} = \\mathbf{350\\,\\text{ns}}$, fitting well within the microsecond coherence window of superconducting qubits.
+- **Datapath Pipeline:** 4 pipeline stages running at 400 MHz (2.5 ns clock period -> 10 ns per iteration).
+- **Mean Converged Latency:** At operational error rates (p <= 0.01), average iteration count is ~1.05 iterations, yielding **10.5 ns** syndrome resolution time.
+- **Worst-Case Tail Latency:** Strictly bounded at 35 * 10 ns = **350 ns**, fitting safely inside the 1 microsecond coherence window of superconducting qubits.
 """))
 
 nb['cells'] = cells
@@ -304,4 +308,4 @@ nb['cells'] = cells
 with open('/Users/deeven/Developer/daq-bp/notebooks/daq_bp_validation.ipynb', 'w') as f:
     nbf.write(nb, f)
 
-print("Notebook successfully generated at /Users/deeven/Developer/daq-bp/notebooks/daq_bp_validation.ipynb")
+print("Clean notebook generated without unrendered LaTeX symbols.")
