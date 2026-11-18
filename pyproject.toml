@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "daq-bp"
+version = "1.0.0"
+description = "Degeneracy-Aware Quantized Belief Propagation Decoder for Quantum LDPC Codes"
+readme = "README.md"
+authors = [{ name = "Deeven Seru", email = "deevenseru11@gmail.com" }]
+license = { text = "MIT" }
+keywords = ["quantum-error-correction", "qldpc", "belief-propagation", "stim", "fpga"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Physics",
+    "License :: OSI Approved :: MIT License",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.20",
+    "stim>=1.16",
+]
+
+[project.urls]
+Homepage = "https://github.com/Deeven-Seru/daq-bp"
+Paper = "https://github.com/Deeven-Seru/daq-bp/blob/main/paper/daq_bp_paper.pdf"
+Repository = "https://github.com/Deeven-Seru/daq-bp.git"
