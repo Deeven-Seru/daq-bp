@@ -3,6 +3,7 @@
 > **Status: Research Prototype / Preliminary Work**  
 > This repository contains the reference implementation, experimental benchmarks, and draft manuscript for DAQ-BP, an integer-quantized belief propagation decoder for quantum LDPC codes.
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24333038.svg)](https://doi.org/10.5281/zenodo.24333038)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
@@ -76,7 +77,24 @@ python benchmarks/benchmark_code_capacity.py
 
 ## Hardware Model Notes
 
-The hardware latency budget is based on a 4-stage pipelined check-and-variable node processing unit running at $400\,\text{MHz}$ ($2.5\,\text{ns}$ clock period, $10\,\text{ns}$ per complete BP iteration). At an average convergence depth of $4.4$ to $5.5$ iterations, the analytical latency is $44\,\text{ns} - 55\,\text{ns}$. Physical place-and-route reports in AMD Vivado are in preparation.
+The hardware latency budget is based on a 4-stage pipelined check-and-variable node processing unit running at $400\,\text{MHz}$ ($2.5\,\text{ns}$ clock period, $10\,\text{ns}$ per complete BP iteration). At operational error rates ($p \le 1\%$), average converged depth is $1.03 - 1.07$ iterations, yielding an analytical latency of $\sim 10.5\,\text{ns}$ and a strict tail latency bound of $350\,\text{ns}$ (35 iterations). Physical place-and-route reports in AMD Vivado are in preparation.
+
+## Citation
+
+If you use this work or benchmark data, please cite:
+
+```bibtex
+@misc{seru2026daqbp,
+  author       = {Deeven Seru},
+  title        = {{DAQ-BP: Degeneracy-Aware Quantized Belief Propagation for Real-Time Decoding of Quantum LDPC Codes}},
+  month        = nov,
+  year         = 2026,
+  publisher    = {Zenodo},
+  version      = {v1.0.0},
+  doi          = {10.5281/zenodo.24333038},
+  url          = {https://doi.org/10.5281/zenodo.24333038}
+}
+```
 
 ## License
 
